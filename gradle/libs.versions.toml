@@ -1,0 +1,55 @@
+[versions]
+agp = "8.4.2"
+kotlin = "1.9.0"
+coreKtx = "1.13.1"
+daggerHilt = "2.48"
+gson = "2.10.1"
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+appcompat = "1.7.0"
+hilt = "2.49"
+hiltCompiler = "2.48"
+loggingInterceptor = "4.10.0"
+material = "1.12.0"
+retrofit = "2.9.0"
+composeUI = "1.6.8"
+composeActivity = "1.9.0"
+composeNavigation = "2.7.7"
+composeHiltNavigation = "1.2.0"
+runtimeLivedata = "1.6.8"
+dataStore = "1.1.1"
+room = "2.6.1"
+coil = "2.2.2"
+accompanistFlowLayout = "0.28.0"
+
+[libraries]
+accompanist-flowlayout = { group = "com.google.accompanist", name = "accompanist-flowlayout", version.ref = "accompanistFlowLayout" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-gson-converter = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
+retrofit-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "loggingInterceptor" }
+hilt = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hiltCompiler" }
+room = {group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = {group = "androidx.room", name = "room-compiler", version.ref = "room" }
+compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "composeUI" }
+compose-material = { group = "androidx.compose.material", name = "material", version.ref = "composeUI" }
+compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeUI" }
+compose-activity = { group = "androidx.activity", name = "activity-compose", version.ref = "composeActivity" }
+compose-navigation = { group = "androidx.navigation", name = "navigation-compose", version.ref = "composeNavigation" }
+compose-hilt = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "composeHiltNavigation" }
+datastore = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "dataStore" }
+androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+dagger-hilt = { id = "com.google.dagger.hilt.android", version.ref = "daggerHilt" }
+jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
