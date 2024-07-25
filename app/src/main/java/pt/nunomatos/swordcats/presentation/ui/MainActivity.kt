@@ -9,14 +9,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.google.gson.Gson
 import dagger.hilt.android.AndroidEntryPoint
-import pt.nunomatos.swordcats.data.model.ARGUMENT_CAT_DETAILS_KEY
-import pt.nunomatos.swordcats.data.model.CatModel
 import pt.nunomatos.swordcats.data.model.CatsRoute
-import pt.nunomatos.swordcats.presentation.ui.cats.CatsScreen
-import pt.nunomatos.swordcats.presentation.ui.cats.details.CatDetailsScreen
 import pt.nunomatos.swordcats.presentation.compose.CatsAppTheme
+import pt.nunomatos.swordcats.presentation.ui.cats.CatsScreen1
+import pt.nunomatos.swordcats.presentation.ui.cats.details.CatDetailsScreen
 import pt.nunomatos.swordcats.presentation.ui.login.LoginScreen
 import pt.nunomatos.swordcats.presentation.ui.splash.SplashScreen
 
@@ -48,7 +45,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(CatsRoute.Cats.name) {
-                            CatsScreen(
+                            CatsScreen1(
                                 viewModel = hiltViewModel(),
                                 navController = navController
                             )
@@ -56,10 +53,7 @@ class MainActivity : ComponentActivity() {
                         composable(
                             route = CatsRoute.CatDetails.name
                         ) {
-                            val catStr = it.arguments?.getString(ARGUMENT_CAT_DETAILS_KEY).orEmpty()
-                            val cat = Gson().fromJson(catStr, CatModel::class.java)
                             CatDetailsScreen(
-                                cat = cat,
                                 viewModel = hiltViewModel(),
                                 navController = navController
                             )

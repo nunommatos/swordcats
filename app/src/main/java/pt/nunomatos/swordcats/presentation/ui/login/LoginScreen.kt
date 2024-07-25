@@ -43,17 +43,13 @@ fun LoginScreen(
     viewModel: LoginViewModel,
     navController: NavController,
 ) {
-    val showRegistration by viewModel.readShowRegistrationFormFlow.collectAsState()
-    val readLoginEmailFlow by viewModel.readLoginEmailFlow.collectAsState()
-    val readLoginNameFlow by viewModel.readLoginNameFlow.collectAsState()
+    val loginUIState by viewModel.readLoginUIState.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.loginState.collect { state ->
-            if (state.isLoggedIn()) {
-                navController.navigate(CatsRoute.Cats.name) {
-                    popUpTo(0) {
-                        inclusive = true
-                    }
+        viewModel.readLoginCompletedFlow.collect { _ ->
+            navController.navigate(CatsRoute.Cats.name) {
+                popUpTo(0) {
+                    inclusive = true
                 }
             }
         }
@@ -100,7 +96,7 @@ fun LoginScreen(
                     Text(
                         modifier = Modifier.fillMaxWidth(),
                         text = stringResource(
-                            id = if (showRegistration) {
+                            id = if (loginUIState.createAccount) {
                                 R.string.login_screen_register_message
                             } else {
                                 R.string.login_screen_login_message
@@ -118,19 +114,19 @@ fun LoginScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 32.dp),
-                        value = if (showRegistration) {
-                            readLoginNameFlow
+                        value = if (loginUIState.createAccount) {
+                            loginUIState.name
                         } else {
-                            readLoginEmailFlow
+                            loginUIState.email
                         },
                         onValueChanged = {
-                            if (showRegistration) {
+                            if (loginUIState.createAccount) {
                                 viewModel.updateLoginName(it)
                             } else {
                                 viewModel.updateLoginEmail(it)
                             }
                         },
-                        hintRes = if (showRegistration) {
+                        hintRes = if (loginUIState.createAccount) {
                             R.string.input_hint_name
                         } else {
                             R.string.input_hint_email
@@ -139,7 +135,7 @@ fun LoginScreen(
                 }
             )
 
-            if (showRegistration) {
+            if (loginUIState.createAccount) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -148,7 +144,7 @@ fun LoginScreen(
                     content = {
                         SwordCatsButton(
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = readLoginNameFlow.isNotBlank(),
+                            enabled = loginUIState.name.isNotBlank(),
                             textRes = R.string.login_screen_register,
                             onClick = {
                                 viewModel.registerUser()
@@ -172,7 +168,7 @@ fun LoginScreen(
                         .fillMaxWidth()
                         .align(Alignment.BottomCenter)
                         .padding(vertical = 16.dp),
-                    enabled = readLoginEmailFlow.isNotBlank(),
+                    enabled = loginUIState.email.isNotBlank(),
                     textRes = R.string.login_screen_login,
                     onClick = {
                         viewModel.login()

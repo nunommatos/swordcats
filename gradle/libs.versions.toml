@@ -14,6 +14,7 @@ loggingInterceptor = "4.10.0"
 material = "1.12.0"
 retrofit = "2.9.0"
 composeUI = "1.6.8"
+kotlinxCoroutinesTest = "1.7.3"
 composeActivity = "1.9.0"
 composeNavigation = "2.7.7"
 composeHiltNavigation = "1.2.0"
@@ -22,6 +23,7 @@ dataStore = "1.1.1"
 room = "2.6.1"
 coil = "2.2.2"
 accompanistFlowLayout = "0.28.0"
+mockito = "5.5.0"
 
 [libraries]
 accompanist-flowlayout = { group = "com.google.accompanist", name = "accompanist-flowlayout", version.ref = "accompanistFlowLayout" }
@@ -38,8 +40,8 @@ retrofit-gson-converter = { group = "com.squareup.retrofit2", name = "converter-
 retrofit-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "loggingInterceptor" }
 hilt = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hiltCompiler" }
-room = {group = "androidx.room", name = "room-ktx", version.ref = "room" }
-room-compiler = {group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "composeUI" }
 compose-material = { group = "androidx.compose.material", name = "material", version.ref = "composeUI" }
 compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeUI" }
@@ -48,6 +50,8 @@ compose-navigation = { group = "androidx.navigation", name = "navigation-compose
 compose-hilt = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "composeHiltNavigation" }
 datastore = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "dataStore" }
 androidx-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtimeLivedata" }
+mockito = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

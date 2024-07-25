@@ -7,7 +7,7 @@ import android.net.Uri
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
-import pt.nunomatos.swordcats.data.model.ApiResponseModel
+import pt.nunomatos.swordcats.data.model.ApiResponse
 import pt.nunomatos.swordcats.data.model.NoNetworkException
 import retrofit2.Response
 
@@ -29,53 +29,53 @@ fun Context.openUrl(url: String) {
     }
 }
 
-fun <T> (suspend () -> Response<T>).toApiResponseFlow(): Flow<ApiResponseModel<T>> {
+fun <T> (suspend () -> Response<T>).toApiResponseFlow(): Flow<ApiResponse<T>> {
     val call = this
     return flow {
-        emit(ApiResponseModel.Loading)
+        emit(ApiResponse.Loading)
         val callResponse = call()
         try {
             val responseBody = callResponse.body()
             if (callResponse.isSuccessful && responseBody != null) {
-                emit(ApiResponseModel.Success(responseBody))
+                emit(ApiResponse.Success(responseBody))
             } else {
-                emit(ApiResponseModel.Error.GenericError)
+                emit(ApiResponse.Error.GenericError)
             }
         } catch (e: Exception) {
-            emit(ApiResponseModel.Error.GenericError)
+            emit(ApiResponse.Error.GenericError)
         }
     }.catch { exception ->
         emit(
             if (exception is NoNetworkException) {
-                ApiResponseModel.Error.NetworkError
+                ApiResponse.Error.NetworkError
             } else {
-                ApiResponseModel.Error.GenericError
+                ApiResponse.Error.GenericError
             }
         )
     }
 }
 
-fun <T> (suspend () -> Response<T>).toNullableApiResponseFlow(): Flow<ApiResponseModel<T?>> {
+fun <T> (suspend () -> Response<T>).toNullableApiResponseFlow(): Flow<ApiResponse<T?>> {
     val call = this
     return flow {
-        emit(ApiResponseModel.Loading)
+        emit(ApiResponse.Loading)
         val callResponse = call()
         try {
             val responseBody = callResponse.body()
             if (callResponse.isSuccessful) {
-                emit(ApiResponseModel.Success(responseBody))
+                emit(ApiResponse.Success(responseBody))
             } else {
-                emit(ApiResponseModel.Error.GenericError)
+                emit(ApiResponse.Error.GenericError)
             }
         } catch (e: Exception) {
-            emit(ApiResponseModel.Error.GenericError)
+            emit(ApiResponse.Error.GenericError)
         }
     }.catch { exception ->
         emit(
             if (exception is NoNetworkException) {
-                ApiResponseModel.Error.NetworkError
+                ApiResponse.Error.NetworkError
             } else {
-                ApiResponseModel.Error.GenericError
+                ApiResponse.Error.GenericError
             }
         )
     }

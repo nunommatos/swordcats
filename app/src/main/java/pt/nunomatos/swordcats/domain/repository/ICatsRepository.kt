@@ -1,23 +1,28 @@
 package pt.nunomatos.swordcats.domain.repository
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
-import pt.nunomatos.swordcats.data.model.ApiResponseModel
 import pt.nunomatos.swordcats.data.model.CatModel
 import pt.nunomatos.swordcats.data.model.FavoriteCatModel
 import pt.nunomatos.swordcats.data.model.UserFeedModel
+import retrofit2.Response
 
 interface ICatsRepository {
 
-    fun getCatBreeds(page: Int): Flow<ApiResponseModel<List<CatModel>>>
+    fun getCats(initialRequest: Boolean): (suspend () -> Response<List<CatModel>>)
 
-    fun addCatAsFavorite(catId: String): Flow<ApiResponseModel<FavoriteCatModel>>
+    fun getFavoriteCats(cats: List<CatModel>): (suspend () -> Response<List<FavoriteCatModel>>)
 
-    fun removeCatAsFavorite(catId: String): Flow<ApiResponseModel<FavoriteCatModel>>
+    fun hasLocalFeed(): Boolean
 
-    fun updateFavoriteCat(favoriteCat: FavoriteCatModel)
+    fun addCatAsFavorite(catId: String): (suspend () -> Response<FavoriteCatModel>)
 
-    fun resetInformation()
+    fun removeCatAsFavorite(catId: String): (suspend () -> Response<Void>)
 
-    fun listenToUserFeedFlow(): StateFlow<UserFeedModel?>
+    suspend fun updateFavoriteCat(favoriteCat: FavoriteCatModel)
+
+    suspend fun updateUserFeed(cats: List<CatModel>, initialRequest: Boolean)
+
+    fun updateFavoriteCats(favoriteCatsList: List<FavoriteCatModel>)
+
+    fun listenToLocalFeedFlow(): Flow<UserFeedModel>
 }

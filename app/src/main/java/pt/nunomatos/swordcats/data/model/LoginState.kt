@@ -1,12 +1,16 @@
 package pt.nunomatos.swordcats.data.model
 
-sealed class LoginState(val user: UserModel?) {
-    data object Unknown : LoginState(user = null)
-    data class LoggedIn(val loggedUser: UserModel) : LoginState(user = loggedUser)
-    data object LoggedOut : LoginState(user = null)
+sealed class LoginState {
+    data object Unknown : LoginState()
+    data object LoggedIn : LoginState()
+    data object LoggedOut : LoginState()
 
     fun isLoggedIn(): Boolean {
         return this is LoggedIn
+    }
+
+    fun isLoggedOut(): Boolean {
+        return this is LoggedOut
     }
 
     fun isUnknown(): Boolean {

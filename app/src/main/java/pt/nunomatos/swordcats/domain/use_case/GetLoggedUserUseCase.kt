@@ -1,13 +1,14 @@
 package pt.nunomatos.swordcats.domain.use_case
 
+import kotlinx.coroutines.flow.Flow
 import pt.nunomatos.swordcats.data.model.UserModel
 import pt.nunomatos.swordcats.domain.repository.IUserRepository
 import javax.inject.Inject
 
-class GetUserUseCase @Inject constructor(
+class GetLoggedUserUseCase @Inject constructor(
     private val userRepository: IUserRepository
 ) {
-    suspend operator fun invoke(email: String): UserModel? {
-        return userRepository.getUserWithEmail(email)
+    operator fun invoke(): Flow<UserModel?> {
+        return userRepository.listenToCurrentUser()
     }
 }

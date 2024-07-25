@@ -7,12 +7,12 @@ import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import pt.nunomatos.swordcats.data.model.LoginState
-import pt.nunomatos.swordcats.data.model.UserFeedModel
 import pt.nunomatos.swordcats.data.model.UserModel
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,10 +33,7 @@ class LocalDataSource @Inject constructor(
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
     private val loginStateFlow: MutableStateFlow<LoginState> = MutableStateFlow(LoginState.Unknown)
-    val readLoginStateFlow: StateFlow<LoginState> = loginStateFlow
-
     private val currentUserFlow: MutableStateFlow<UserModel?> = MutableStateFlow(null)
-    val readCurrentUserFlow: StateFlow<UserModel?> = currentUserFlow
 
     init {
         coroutineScope.launch {
@@ -44,7 +41,7 @@ class LocalDataSource @Inject constructor(
                 val user = userDao.getById(userId.orEmpty())
                 loginStateFlow.emit(
                     if (user != null) {
-                        LoginState.LoggedIn(user)
+                        LoginState.LoggedIn
                     } else {
                         LoginState.LoggedOut
                     }
@@ -52,6 +49,14 @@ class LocalDataSource @Inject constructor(
                 currentUserFlow.emit(user)
             }
         }
+    }
+
+    fun listenToCurrentUser(): Flow<UserModel?> {
+        return currentUserFlow.asStateFlow()
+    }
+
+    fun listenToLoginState(): Flow<LoginState> {
+        return loginStateFlow.asStateFlow()
     }
 
     suspend fun getUserWithEmail(email: String): UserModel? {
@@ -64,16 +69,14 @@ class LocalDataSource @Inject constructor(
         return user
     }
 
-    suspend fun registerUser(user: UserModel) {
+    suspend fun createUser(user: UserModel) {
         userDao.insert(user)
         context.dataStore.edit { it[KEY_CURRENT_USER_ID] = user.id }
     }
 
-    suspend fun updateUserFeed(userFeed: UserFeedModel) {
-        currentUserFlow.value?.copy(userFeed = userFeed)?.let {
-            currentUserFlow.emit(it)
-            userDao.update(it)
-        }
+    suspend fun updateUser(user: UserModel) {
+        currentUserFlow.emit(user)
+        userDao.update(user)
     }
 
     suspend fun logout() {

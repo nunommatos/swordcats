@@ -11,6 +11,10 @@ data class CatModel(
     val height: Int = 0,
     val favoriteId: String? = null
 ) {
+    fun getBreedName(): String {
+        return breeds.first().name
+    }
+
     fun getAverageLifeSpanText(): String {
         return breeds.first().lifeSpan
     }

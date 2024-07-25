@@ -1,19 +1,23 @@
 package pt.nunomatos.swordcats.data.model
 
-sealed class ApiResponseModel<out T>(val data: T?) {
-    data object Start : ApiResponseModel<Nothing>(data = null)
+sealed class ApiResponse<out T>(val data: T?) {
+    data object Start : ApiResponse<Nothing>(data = null)
 
-    data class Success<out T>(val responseData: T) : ApiResponseModel<T>(data = responseData)
+    data class Success<out T>(val responseData: T) : ApiResponse<T>(data = responseData)
 
-    data object Loading : ApiResponseModel<Nothing>(data = null)
+    data object Loading : ApiResponse<Nothing>(data = null)
 
-    sealed class Error : ApiResponseModel<Nothing>(data = null) {
+    sealed class Error : ApiResponse<Nothing>(data = null) {
         data object GenericError : Error()
         data object NetworkError : Error()
     }
 
     fun isSuccess(): Boolean {
         return this is Success
+    }
+
+    fun isStart(): Boolean {
+        return this is Start
     }
 
     fun isLoading(): Boolean {

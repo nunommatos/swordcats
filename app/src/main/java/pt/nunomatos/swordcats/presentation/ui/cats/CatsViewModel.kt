@@ -3,84 +3,106 @@ package pt.nunomatos.swordcats.presentation.ui.cats
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import pt.nunomatos.swordcats.data.model.ApiResponseModel
+import pt.nunomatos.swordcats.data.model.ApiResponse
 import pt.nunomatos.swordcats.data.model.CatModel
-import pt.nunomatos.swordcats.data.model.LoginState
-import pt.nunomatos.swordcats.data.model.UserFeedModel
+import pt.nunomatos.swordcats.data.model.UserModel
+import pt.nunomatos.swordcats.domain.model.LocalFeedMessage
 import pt.nunomatos.swordcats.domain.use_case.GetCatsUseCase
-import pt.nunomatos.swordcats.domain.use_case.GetLoginStateUseCase
-import pt.nunomatos.swordcats.domain.use_case.GetUserFeedUseCase
+import pt.nunomatos.swordcats.domain.use_case.GetLocalFeedUseCase
+import pt.nunomatos.swordcats.domain.use_case.GetLoggedUserUseCase
 import pt.nunomatos.swordcats.domain.use_case.LogoutUseCase
 import pt.nunomatos.swordcats.domain.use_case.UpdateFavoriteCatStateUseCase
-import pt.nunomatos.swordcats.domain.use_case.UpdateUserFeedUseCase
 import javax.inject.Inject
 
 @HiltViewModel
 class CatsViewModel @Inject constructor(
-    getUserFeedUseCase: GetUserFeedUseCase,
     private val getCatsUseCase: GetCatsUseCase,
-    getLoginStateUseCase: GetLoginStateUseCase,
+    getLocalFeedUseCase: GetLocalFeedUseCase,
+    getLoggedUserUseCase: GetLoggedUserUseCase,
     private val logoutUseCase: LogoutUseCase,
-    private val updateFavoriteCatStateUseCase: UpdateFavoriteCatStateUseCase,
-    private val updateUserFeedUseCase: UpdateUserFeedUseCase
+    private val updateFavoriteCatStateUseCase: UpdateFavoriteCatStateUseCase
 ) : ViewModel() {
 
+    private val loggedUserFlow: MutableStateFlow<UserModel> = MutableStateFlow(UserModel())
+    val readLoggedUserFlow = loggedUserFlow.asStateFlow()
+
+    private val catsListFlow: MutableStateFlow<List<CatModel>> = MutableStateFlow(listOf())
+    val readCatsListFlow = catsListFlow.asStateFlow()
+
+    private val logoutFlow: MutableSharedFlow<Unit> = MutableSharedFlow()
+    val readLogoutFlow = logoutFlow.asSharedFlow()
+
+    private val loadMoreCatsState: MutableStateFlow<ApiResponse<*>> =
+        MutableStateFlow(ApiResponse.Start)
+    val readLoadMoreCatsState = loadMoreCatsState.asStateFlow()
+
+    private val mainStateFlow: MutableStateFlow<ApiResponse<*>> =
+        MutableStateFlow(ApiResponse.Start)
+    val readMainStateFlow = mainStateFlow.asStateFlow()
+
+    private val secondaryStateFlow: MutableStateFlow<ApiResponse<*>> =
+        MutableStateFlow(ApiResponse.Start)
+    val readSecondaryStateFlow = secondaryStateFlow.asStateFlow()
+
+    private val localFeedMessage: MutableStateFlow<LocalFeedMessage> =
+        MutableStateFlow(LocalFeedMessage())
+    val readLocalFeedMessage = localFeedMessage.asStateFlow()
+
     private val searchQueryFlow: MutableStateFlow<String> = MutableStateFlow("")
-    val readSearchQueryFlow: StateFlow<String> = searchQueryFlow
+    val readSearchQueryFlow = searchQueryFlow.asStateFlow()
 
     private val filterFavoritesFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
-//    private val loginStateFlow: MutableStateFlow<LoginState> = MutableStateFlow(LoginState.Unknown)
-    val readLoginStateFlow: StateFlow<LoginState> = getLoginStateUseCase.invoke()
-
     private val currentSelectedTab: MutableStateFlow<Int> = MutableStateFlow(0)
-    val readCurrentSelectedTab: StateFlow<Int> = currentSelectedTab
-
-    private val userFeedFlow: MutableStateFlow<UserFeedModel?> = MutableStateFlow(null)
-    val readUserFeedFlow: StateFlow<UserFeedModel?> = userFeedFlow
-
-    private val mainStateFlow: MutableStateFlow<ApiResponseModel<*>> =
-        MutableStateFlow(ApiResponseModel.Start)
-    val readMainStateFlow: StateFlow<ApiResponseModel<*>> = mainStateFlow
-
-    private val secondaryStateFlow: MutableStateFlow<ApiResponseModel<*>> =
-        MutableStateFlow(ApiResponseModel.Start)
-    val readSecondaryStateFlow: StateFlow<ApiResponseModel<*>> = secondaryStateFlow
-
-    private val loadMoreCatsState: MutableStateFlow<ApiResponseModel<*>> =
-        MutableStateFlow(ApiResponseModel.Start)
-    val readLoadMoreCatsState: StateFlow<ApiResponseModel<*>> = loadMoreCatsState
-
-    private val catsListFlow: MutableStateFlow<List<CatModel>> = MutableStateFlow(listOf())
-    val readCatsListFlow: StateFlow<List<CatModel>> = catsListFlow
-
-    private var page = 0
+    val readCurrentSelectedTab = currentSelectedTab.asStateFlow()
 
     init {
-        getUserFeedUseCase.invoke()
-            .onEach { userFeed ->
-                userFeedFlow.value = userFeed
-                page = userFeed?.feedPage ?: 0
-                userFeed?.let { updateUserFeedUseCase.invoke(it) }
+        viewModelScope.launch {
+            getLoggedUserUseCase.invoke().collect { user ->
+                if (user != null) {
+                    loggedUserFlow.emit(user)
+                } else {
+                    logoutFlow.emit(Unit)
+                }
             }
-            .launchIn(viewModelScope)
+        }
 
         getCats()
 
-//        getLoginStateUseCase.invoke()
-//            .onEach { loginStateFlow.value = it }
-//            .launchIn(viewModelScope)
+        viewModelScope.launch {
+            getLocalFeedUseCase.invoke().collect { localFeed ->
+                localFeedMessage.emit(
+                    LocalFeedMessage(
+                        show = true,
+                        updatedAt = localFeed.getUpdatedDate()
+                    )
+                )
+            }
+        }
 
+        listenToFeedChanges()
+    }
+
+    private fun getCats(initialRequest: Boolean, flowToUpdate: MutableStateFlow<ApiResponse<*>>) {
+        viewModelScope.launch {
+            getCatsUseCase.invoke(initialRequest).collect {
+                flowToUpdate.emit(it)
+            }
+        }
+    }
+
+    private fun listenToFeedChanges() {
         viewModelScope.launch {
             combine(
-                userFeedFlow.filterNotNull(),
+                loggedUserFlow.map { user -> user.userFeed }.filterNotNull(),
                 searchQueryFlow,
                 filterFavoritesFlow,
             ) { feed, query, filterFavorites ->
@@ -99,29 +121,17 @@ class CatsViewModel @Inject constructor(
     }
 
     fun getCats() {
-        getCatsUseCase.invoke(page = page)
-            .onEach {
-                if (page != 0) {
-                    loadMoreCatsState.value = it
-                } else {
-                    mainStateFlow.value = it
-                }
-
-                if (it.isSuccess()) {
-                    page++
-                }
-            }
-            .launchIn(viewModelScope)
+        getCats(
+            initialRequest = true,
+            flowToUpdate = mainStateFlow
+        )
     }
 
-    fun updateSearchQueryValue(query: String) {
-        searchQueryFlow.value = query
-    }
-
-    fun updateFavoriteCatState(id: String, isFavorite: Boolean) {
-        updateFavoriteCatStateUseCase.invoke(id, isFavorite)
-            .onEach { secondaryStateFlow.value = it }
-            .launchIn(viewModelScope)
+    fun getMoreCats() {
+        getCats(
+            initialRequest = false,
+            flowToUpdate = loadMoreCatsState
+        )
     }
 
     fun updateSelectedTab(index: Int, filterFavorites: Boolean) {
@@ -129,10 +139,33 @@ class CatsViewModel @Inject constructor(
         filterFavoritesFlow.value = filterFavorites
     }
 
+    fun updateSearchQueryValue(query: String) {
+        searchQueryFlow.value = query
+    }
+
+    fun updateFavoriteCatState(id: String, isFavorite: Boolean) {
+        viewModelScope.launch {
+            updateFavoriteCatStateUseCase.invoke(id, isFavorite).collect {
+                secondaryStateFlow.emit(it)
+            }
+        }
+    }
+
+    fun dismissError() {
+        secondaryStateFlow.value = ApiResponse.Start
+    }
+
+    fun dismissLoadMoreCatsError() {
+        loadMoreCatsState.value = ApiResponse.Start
+    }
+
+    fun dismissLocalFeedMessage() {
+        localFeedMessage.value = LocalFeedMessage()
+    }
+
     fun logout() {
         viewModelScope.launch {
             logoutUseCase.invoke()
-            page = 0
         }
     }
 }

@@ -33,9 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,11 +53,8 @@ import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import pt.nunomatos.swordcats.R
 import pt.nunomatos.swordcats.common.Constants
-import pt.nunomatos.swordcats.data.model.ARGUMENT_CAT_DETAILS_VALUE
-import pt.nunomatos.swordcats.data.model.ApiResponseModel
 import pt.nunomatos.swordcats.data.model.CatModel
 import pt.nunomatos.swordcats.data.model.CatsRoute
-import pt.nunomatos.swordcats.data.model.UserFeedModel
 import pt.nunomatos.swordcats.presentation.compose.AppBackground
 import pt.nunomatos.swordcats.presentation.compose.BottomSnackbar
 import pt.nunomatos.swordcats.presentation.compose.DarkGray
@@ -74,74 +69,45 @@ private const val TAB_ALL = 0
 private const val TAB_FAVORITES = 1
 
 @Composable
-fun CatsScreen(
+fun CatsScreen1(
     viewModel: CatsViewModel,
     navController: NavController,
 ) {
-    val mainState by viewModel.readMainStateFlow.collectAsState()
+    val loggedUser by viewModel.readLoggedUserFlow.collectAsState()
     val catsList by viewModel.readCatsListFlow.collectAsState()
+    val loadMoreCatsState by viewModel.readLoadMoreCatsState.collectAsState()
+    val mainState by viewModel.readMainStateFlow.collectAsState()
     val searchQueryValue by viewModel.readSearchQueryFlow.collectAsState()
     val tabIndex by viewModel.readCurrentSelectedTab.collectAsState()
     val catsListState = rememberLazyListState()
-    var userName by remember { mutableStateOf("") }
-    var userFeed by remember { mutableStateOf<UserFeedModel?>(null) }
-    var showNetworkSnackbar by remember { mutableStateOf(false) }
-    var secondaryState by remember { mutableStateOf<ApiResponseModel<*>?>(null) }
-    var loadMoreCatsState by remember { mutableStateOf<ApiResponseModel<*>?>(null) }
+
     val isOnCatsListBottom by remember {
         derivedStateOf {
-            catsListState.layoutInfo.visibleItemsInfo.lastOrNull()?.let { lastVisibleItem ->
-                lastVisibleItem.index != 0 &&
-                        lastVisibleItem.index == catsListState.layoutInfo.totalItemsCount - 1
+            val visibleItemsInfo = catsListState.layoutInfo.visibleItemsInfo
+            visibleItemsInfo.lastOrNull()?.let { lastVisibleItem ->
+                lastVisibleItem.index > 0 && lastVisibleItem.index < visibleItemsInfo.lastIndex &&
+                        tabIndex == TAB_ALL
             } ?: false
         }
     }
 
-    LaunchedEffect(Unit) {
-        userFeed = viewModel.readUserFeedFlow.value
-        if (userFeed?.isLocalFeed == true) {
-            showNetworkSnackbar = true
-            delay(Constants.Animation.DURATION_SNACKBAR)
-            showNetworkSnackbar = false
+    if (isOnCatsListBottom && !loadMoreCatsState.isLoading()) {
+        viewModel.getMoreCats()
+    } else if (loadMoreCatsState.isError()) {
+        LaunchedEffect(Unit) {
+            delay(Constants.Animation.DURATION_SNACKBAR_SHORT)
+            viewModel.dismissLoadMoreCatsError()
         }
     }
 
     LaunchedEffect(Unit) {
-        viewModel.readSecondaryStateFlow.collect { state ->
-            secondaryState = state
-            if (state.isError()) {
-                delay(Constants.Animation.DURATION_SNACKBAR)
-                secondaryState = null
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.readLoginStateFlow.collect { loginState ->
-            if (loginState.isLoggedIn()) {
-                userName = loginState.user?.name.orEmpty()
-            } else {
-                navController.navigate(CatsRoute.Login.name) {
-                    popUpTo(0) {
-                        inclusive = true
-                    }
+        viewModel.readLogoutFlow.collect {
+            navController.navigate(CatsRoute.Login.name) {
+                popUpTo(0) {
+                    inclusive = true
                 }
             }
         }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.readLoadMoreCatsState.collect { state ->
-            loadMoreCatsState = state
-            if (state.isError()) {
-                delay(Constants.Animation.DURATION_SNACKBAR)
-                loadMoreCatsState = null
-            }
-        }
-    }
-
-    if (isOnCatsListBottom && loadMoreCatsState?.isLoading() != true) {
-        viewModel.getCats()
     }
 
     Column(
@@ -183,7 +149,10 @@ fun CatsScreen(
                         modifier = Modifier
                             .padding(horizontal = 12.dp)
                             .weight(1f),
-                        text = "Hello, $userName",
+                        text = stringResource(
+                            id = R.string.cats_screen_greeting,
+                            loggedUser.name.orEmpty()
+                        ),
                         style = TextStyle(
                             color = Color.LightGray,
                             fontSize = 18.sp,
@@ -256,12 +225,12 @@ fun CatsScreen(
                                 if (catsList.isNotEmpty()) {
                                     CatsListView(
                                         lazyState = catsListState,
-                                        showLoading = loadMoreCatsState?.isLoading() == true,
+                                        showLoading = loadMoreCatsState.isLoading(),
                                         catsList = catsList,
                                         onCatClicked = {
                                             navController.navigate(
                                                 CatsRoute.CatDetails.name.replace(
-                                                    ARGUMENT_CAT_DETAILS_VALUE,
+                                                    Constants.Keys.ARGUMENT_CAT_DETAILS_VALUE,
                                                     Gson().toJson(it)
                                                 )
                                             )
@@ -316,31 +285,58 @@ fun CatsScreen(
     )
 
     BottomSnackbar(
-        message = stringResource(
-            id = R.string.cats_screen_outdated_information,
-            userFeed?.getUpdatedDate().orEmpty()
-        ),
-        show = showNetworkSnackbar
+        message = stringResource(id = R.string.error_message_loading_more_cats),
+        show = loadMoreCatsState.isError()
     )
 
-    if (secondaryState?.isLoading() == true) {
+    LocalFeedMessage(viewModel = viewModel)
+
+    SecondaryNetworkStateView(viewModel = viewModel)
+}
+
+@Composable
+private fun LocalFeedMessage(viewModel: CatsViewModel) {
+    val localFeedMessage by viewModel.readLocalFeedMessage.collectAsState()
+    if (localFeedMessage.show) {
+        LaunchedEffect(Unit) {
+            delay(Constants.Animation.DURATION_SNACKBAR_LONG)
+            viewModel.dismissLocalFeedMessage()
+        }
+    }
+
+    BottomSnackbar(
+        message = stringResource(
+            id = R.string.cats_screen_outdated_information,
+            localFeedMessage.updatedAt
+        ),
+        show = localFeedMessage.show
+    )
+}
+
+@Composable
+private fun SecondaryNetworkStateView(viewModel: CatsViewModel) {
+    val state by viewModel.readSecondaryStateFlow.collectAsState()
+
+    if (state.isError()) {
+        LaunchedEffect(Unit) {
+            delay(Constants.Animation.DURATION_SNACKBAR_SHORT)
+            viewModel.dismissError()
+        }
+    }
+
+    if (state.isLoading()) {
         LoadingOverlay()
     }
 
     BottomSnackbar(
         message = stringResource(
-            id = if (secondaryState?.isGenericError() == true) {
+            id = if (state.isGenericError()) {
                 R.string.snackbar_message_error_generic
             } else {
                 R.string.snackbar_message_error_no_internet
             }
         ),
-        show = secondaryState?.isError() == true
-    )
-
-    BottomSnackbar(
-        message = stringResource(id = R.string.error_message_loading_more_cats),
-        show = loadMoreCatsState?.isError() == true
+        show = state.isError()
     )
 }
 

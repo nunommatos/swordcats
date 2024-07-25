@@ -1,222 +1,154 @@
 package pt.nunomatos.swordcats.data.repository
 
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flatMapMerge
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
-import pt.nunomatos.swordcats.common.toApiResponseFlow
-import pt.nunomatos.swordcats.common.toNullableApiResponseFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import pt.nunomatos.swordcats.data.local.LocalDataSource
-import pt.nunomatos.swordcats.data.model.ApiResponseModel
 import pt.nunomatos.swordcats.data.model.CatModel
 import pt.nunomatos.swordcats.data.model.FavoriteCatModel
 import pt.nunomatos.swordcats.data.model.FavoriteCatRequestModel
 import pt.nunomatos.swordcats.data.model.UserFeedModel
+import pt.nunomatos.swordcats.data.model.UserModel
 import pt.nunomatos.swordcats.data.remote.RemoteDataSource
 import pt.nunomatos.swordcats.domain.repository.ICatsRepository
+import retrofit2.Response
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class CatsRepository @Inject constructor(
     private val localDataSource: LocalDataSource,
-    private val remoteDataSource: RemoteDataSource,
+    private val remoteDataSource: RemoteDataSource
 ) : ICatsRepository {
-    private var favoriteCatBreeds: ArrayList<FavoriteCatModel>? = null
 
-    private val userFeedFlow: MutableStateFlow<UserFeedModel?> = MutableStateFlow(null)
+    private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    override fun getCatBreeds(page: Int): Flow<ApiResponseModel<List<CatModel>>> {
-        return remoteDataSource.getCatBreeds(page)
-            .toApiResponseFlow()
-            .flatMapMerge { catsResponse ->
-                when {
-                    catsResponse.isSuccess() -> {
-                        val cats = catsResponse.data.orEmpty()
+    private val localFeedFlow = MutableSharedFlow<UserFeedModel>()
 
-                        if (favoriteCatBreeds != null) {
-                            updateFeed(page = page, cats = cats)
-                            flow { emit(ApiResponseModel.Success(cats)) }
-                        } else {
-                            val userId = localDataSource.readCurrentUserFlow.value?.id
-                            remoteDataSource.getFavoriteCatBreeds(userId.orEmpty())
-                                .toApiResponseFlow()
-                                .map { response ->
-                                    when {
-                                        response.isSuccess() -> {
-                                            favoriteCatBreeds =
-                                                ArrayList(
-                                                    response.data.orEmpty().map { favoriteCat ->
-                                                        FavoriteCatModel(
-                                                            id = favoriteCat.id,
-                                                            catId = favoriteCat.catId
-                                                        )
-                                                    }
-                                                )
+    private var favoriteCats: ArrayList<FavoriteCatModel>? = null
+    private var currentUser: UserModel? = null
 
-                                            updateFeed(page = page, cats = cats)
-                                            ApiResponseModel.Success(cats)
-                                        }
+    init {
+        coroutineScope.launch {
+            localDataSource.listenToCurrentUser().collect {
+                currentUser = it
 
-                                        response.isError() -> {
-                                            if (response.isNetworkError()) {
-                                                ApiResponseModel.Error.NetworkError
-                                            } else {
-                                                ApiResponseModel.Error.GenericError
-                                            }
-                                        }
-
-                                        else -> {
-                                            ApiResponseModel.Loading
-                                        }
-                                    }
-                                }
-                        }
-                    }
-
-                    catsResponse.isError() -> {
-                        if (catsResponse.isNetworkError()) {
-                            val localFeed =
-                                localDataSource.readCurrentUserFlow.value?.userFeed?.copy(
-                                    isLocalFeed = true
-                                )
-
-                            // if the local feed's page is greater or equal than the request page
-                            // it means it's already been retrieved and saved, so we can display
-                            // the local version of the feed
-                            if (localFeed != null && localFeed.feedPage >= page) {
-                                userFeedFlow.value = localFeed
-                                flow { emit(ApiResponseModel.Success(localFeed.cats)) }
-                            } else {
-                                flow { emit(catsResponse) }
-                            }
-                        } else {
-                            flow { emit(catsResponse) }
-                        }
-                    }
-
-                    else -> {
-                        flow { emit(ApiResponseModel.Loading) }
-                    }
+                // the user logged out
+                if (it == null) {
+                    favoriteCats = null
                 }
             }
+        }
     }
 
-    override fun addCatAsFavorite(catId: String): Flow<ApiResponseModel<FavoriteCatModel>> {
-        val userId = localDataSource.readCurrentUserFlow.value?.id
-        return remoteDataSource.addCatAsFavorite(
-            FavoriteCatRequestModel(
-                catId = catId,
-                userId = userId.orEmpty()
-            )
-        )
-            .toApiResponseFlow()
-            .map { response ->
-                when {
-                    response.isSuccess() -> {
-                        val favoriteCat = FavoriteCatModel(
-                            id = response.data?.id.orEmpty(),
-                            catId = catId,
-                        )
-                        favoriteCatBreeds?.add(favoriteCat)
-                        ApiResponseModel.Success(responseData = favoriteCat)
-                    }
-
-                    response.isError() -> {
-                        response
-                    }
-
-                    else -> {
-                        ApiResponseModel.Loading
-                    }
-                }
+    override fun hasLocalFeed(): Boolean {
+        val hasLocalFeed = currentUser?.userFeed != null
+        if (hasLocalFeed) {
+            coroutineScope.launch {
+                localFeedFlow.emit(currentUser?.userFeed!!)
             }
+        }
+        return hasLocalFeed
     }
 
-    override fun removeCatAsFavorite(catId: String): Flow<ApiResponseModel<FavoriteCatModel>> {
-        val catToRemove = favoriteCatBreeds?.firstOrNull { it.catId == catId }
-        return remoteDataSource.removeCatAsFavorite(
-            catId = catToRemove?.id.orEmpty()
-        )
-            .toNullableApiResponseFlow()
-            .map { response ->
-                when {
-                    response.isSuccess() -> {
-                        favoriteCatBreeds?.remove(catToRemove)
-                        ApiResponseModel.Success(
-                            responseData = FavoriteCatModel(
-                                id = "",
-                                catId = catId
-                            )
-                        )
-                    }
+    override fun getCats(initialRequest: Boolean): suspend () -> Response<List<CatModel>> {
+        val page = if (!initialRequest) {
+            currentUser?.userFeed?.feedPage ?: 0
+        } else {
+            0
+        }
 
-                    response.isError() -> {
-                        if (response.isNetworkError()) {
-                            ApiResponseModel.Error.NetworkError
-                        } else {
-                            ApiResponseModel.Error.GenericError
-                        }
-                    }
-
-                    else -> {
-                        ApiResponseModel.Loading
-                    }
-                }
-            }
+        return remoteDataSource.getCats(page)
     }
 
-    override fun updateFavoriteCat(favoriteCat: FavoriteCatModel) {
-        userFeedFlow.update { userFeed ->
-            userFeed?.copy(
-                cats = userFeed.cats.map { cat ->
-                    if (cat.id == favoriteCat.catId) {
-                        cat.copy(favoriteId = favoriteCat.id)
-                    } else {
-                        cat
-                    }
-                }
+    override fun getFavoriteCats(cats: List<CatModel>): suspend () -> Response<List<FavoriteCatModel>> {
+        return if (favoriteCats != null) {
+            suspend { Response.success(favoriteCats) }
+        } else {
+            remoteDataSource.getFavoriteCatBreeds(
+                userId = currentUser?.id.orEmpty()
             )
         }
     }
 
-    override fun resetInformation() {
-        favoriteCatBreeds = null
-        userFeedFlow.value = null
+    override fun addCatAsFavorite(catId: String): suspend () -> Response<FavoriteCatModel> {
+        return remoteDataSource.addCatAsFavorite(
+            favoriteCat = FavoriteCatRequestModel(
+                catId = catId,
+                userId = currentUser?.id.orEmpty()
+            )
+        )
     }
 
-    override fun listenToUserFeedFlow(): StateFlow<UserFeedModel?> {
-        return userFeedFlow
+    override fun removeCatAsFavorite(catId: String): suspend () -> Response<Void> {
+        val favoriteCatToRemove = favoriteCats?.firstOrNull { it.catId == catId }
+        return remoteDataSource.removeCatAsFavorite(favoriteCatToRemove?.id.orEmpty())
     }
 
-    private fun updateFavoriteState(cats: List<CatModel>): List<CatModel> {
+    override fun updateFavoriteCats(favoriteCatsList: List<FavoriteCatModel>) {
+        favoriteCats = ArrayList(favoriteCatsList)
+    }
+
+    override suspend fun updateUserFeed(cats: List<CatModel>, initialRequest: Boolean) {
+        currentUser?.let {
+            val updatedCats = updateFeedFavoriteCats(cats)
+
+            val feedPage = if (initialRequest) {
+                0
+            } else {
+                it.userFeed?.feedPage ?: 0
+            }
+            val updatedUser = it.copy(
+                userFeed = UserFeedModel.fromNow(
+                    feedPage = feedPage + 1,
+                    cats = if (feedPage > 0) {
+                        it.userFeed?.cats.orEmpty().toMutableList().apply {
+                            addAll(updatedCats)
+                        }
+                    } else {
+                        updatedCats
+                    }
+                )
+            )
+            currentUser = updatedUser
+            localDataSource.updateUser(updatedUser)
+        }
+    }
+
+    override suspend fun updateFavoriteCat(favoriteCat: FavoriteCatModel) {
+        currentUser?.let {
+            if (favoriteCat.id.isNotBlank()) {
+                favoriteCats?.add(favoriteCat)
+            } else {
+                favoriteCats?.removeIf { it.catId == favoriteCat.catId }
+            }
+
+            val currentFeed = it.userFeed
+            val currentCats = currentFeed?.cats.orEmpty()
+            val updatedUser = it.copy(
+                userFeed = UserFeedModel.fromNow(
+                    feedPage = currentFeed?.feedPage ?: 0,
+                    cats = updateFeedFavoriteCats(currentCats)
+                )
+            )
+            currentUser = updatedUser
+            localDataSource.updateUser(updatedUser)
+        }
+    }
+
+    override fun listenToLocalFeedFlow(): Flow<UserFeedModel> {
+        return localFeedFlow.asSharedFlow()
+    }
+
+    private fun updateFeedFavoriteCats(cats: List<CatModel>): List<CatModel> {
         return cats.map { cat ->
             cat.copy(
-                favoriteId = favoriteCatBreeds?.firstOrNull { favoriteCat ->
+                favoriteId = favoriteCats?.firstOrNull { favoriteCat ->
                     favoriteCat.catId == cat.id
                 }?.id
-            )
-        }
-    }
-
-    private fun updateFeed(page: Int, cats: List<CatModel>) {
-        val catsList = updateFavoriteState(cats)
-        userFeedFlow.update { currentFeed ->
-            UserFeedModel.fromNow(
-                feedPage = page,
-                cats = if (page > 0) {
-                    ArrayList(currentFeed?.cats.orEmpty()).apply {
-                        addAll(catsList)
-                    }
-                } else {
-                    catsList
-                },
-                isLocalFeed = false
             )
         }
     }

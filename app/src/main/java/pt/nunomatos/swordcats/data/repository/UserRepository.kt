@@ -1,9 +1,8 @@
 package pt.nunomatos.swordcats.data.repository
 
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
 import pt.nunomatos.swordcats.data.local.LocalDataSource
 import pt.nunomatos.swordcats.data.model.LoginState
-import pt.nunomatos.swordcats.data.model.UserFeedModel
 import pt.nunomatos.swordcats.data.model.UserModel
 import pt.nunomatos.swordcats.domain.repository.IUserRepository
 import java.util.UUID
@@ -15,12 +14,16 @@ class UserRepository @Inject constructor(
     private val localDataSource: LocalDataSource
 ) : IUserRepository {
 
-    override suspend fun getUserWithEmail(email: String): UserModel? {
-        return localDataSource.getUserWithEmail(email)
+    override fun listenToCurrentUser(): Flow<UserModel?> {
+        return localDataSource.listenToCurrentUser()
     }
 
-    override suspend fun registerUser(name: String, email: String) {
-        localDataSource.registerUser(
+    override fun listenToLoginState(): Flow<LoginState> {
+        return localDataSource.listenToLoginState()
+    }
+
+    override suspend fun createUser(name: String, email: String) {
+        localDataSource.createUser(
             user = UserModel(
                 id = UUID.randomUUID().toString(),
                 name = name,
@@ -29,15 +32,11 @@ class UserRepository @Inject constructor(
         )
     }
 
-    override suspend fun updateUserFeed(userFeed: UserFeedModel) {
-        localDataSource.updateUserFeed(userFeed)
+    override suspend fun getUserWithEmail(email: String): UserModel? {
+        return localDataSource.getUserWithEmail(email)
     }
 
     override suspend fun logout() {
         localDataSource.logout()
-    }
-
-    override fun listenToUserLoginState(): StateFlow<LoginState> {
-        return localDataSource.readLoginStateFlow
     }
 }

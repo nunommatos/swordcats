@@ -1,7 +1,7 @@
 package pt.nunomatos.swordcats.data.model
 
-const val ARGUMENT_CAT_DETAILS_KEY = "cat"
-const val ARGUMENT_CAT_DETAILS_VALUE = "{cat}"
+import pt.nunomatos.swordcats.common.Constants.Keys.ARGUMENT_CAT_DETAILS_KEY
+import pt.nunomatos.swordcats.common.Constants.Keys.ARGUMENT_CAT_DETAILS_VALUE
 
 sealed class CatsRoute(
     val name: String,

@@ -12,11 +12,11 @@ class RemoteDataSource @Inject constructor(
     private val catsService: CatsService
 ) {
     companion object {
-        private const val REQUEST_LIMIT = 10
+        private const val REQUEST_LIMIT = 20
         private const val REQUEST_HAS_BREEDS = 1
     }
 
-    fun getCatBreeds(page: Int): suspend () -> Response<List<CatModel>> {
+    fun getCats(page: Int): suspend () -> Response<List<CatModel>> {
         return suspend {
             catsService.getCats(
                 limit = REQUEST_LIMIT,

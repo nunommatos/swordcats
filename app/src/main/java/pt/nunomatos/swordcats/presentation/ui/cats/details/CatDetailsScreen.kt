@@ -28,10 +28,8 @@ import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,36 +52,17 @@ import com.google.accompanist.flowlayout.FlowRow
 import kotlinx.coroutines.delay
 import pt.nunomatos.swordcats.R
 import pt.nunomatos.swordcats.common.Constants
-import pt.nunomatos.swordcats.data.model.ApiResponseModel
-import pt.nunomatos.swordcats.data.model.CatModel
+import pt.nunomatos.swordcats.common.openUrl
 import pt.nunomatos.swordcats.presentation.compose.AppBackground
 import pt.nunomatos.swordcats.presentation.compose.BottomSnackbar
 import pt.nunomatos.swordcats.presentation.compose.LightGray
 import pt.nunomatos.swordcats.presentation.compose.LoadingOverlay
 import pt.nunomatos.swordcats.presentation.compose.Purple
 import pt.nunomatos.swordcats.presentation.compose.Raleway
-import pt.nunomatos.swordcats.common.openUrl
 
 @Composable
-fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navController: NavController) {
-    val currentCat = remember { mutableStateOf(cat) }
-    var state by remember { mutableStateOf<ApiResponseModel<*>?>(null) }
-
-    LaunchedEffect(Unit) {
-        viewModel.readCatFlow.collect {
-            currentCat.value = it
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.readStateFlow.collect { newState ->
-            state = newState
-            if (newState.isError()) {
-                delay(Constants.Animation.DURATION_SNACKBAR)
-                state = null
-            }
-        }
-    }
+fun CatDetailsScreen(viewModel: CatDetailsViewModel, navController: NavController) {
+    val currentCat by viewModel.readCatFlow.collectAsState()
 
     Column(
         modifier = Modifier
@@ -109,7 +88,7 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .weight(1f),
-                        text = cat.breeds.first().name,
+                        text = currentCat.getBreedName(),
                         style = TextStyle(
                             color = Color.LightGray,
                             fontSize = 24.sp,
@@ -122,11 +101,11 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                             .size(24.dp)
                             .clickable {
                                 viewModel.updateFavoriteCatState(
-                                    cat = currentCat.value
+                                    cat = currentCat
                                 )
                             },
                         painter = painterResource(
-                            id = if (!currentCat.value.favoriteId.isNullOrBlank()) {
+                            id = if (!currentCat.favoriteId.isNullOrBlank()) {
                                 R.drawable.ic_favorite_on
                             } else {
                                 R.drawable.ic_favorite_off
@@ -153,7 +132,7 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                                     .aspectRatio(4 / 3f)
                                     .clip(RoundedCornerShape(size = 12.dp)),
                                 contentScale = ContentScale.Crop,
-                                model = cat.image,
+                                model = currentCat.image,
                                 contentDescription = null
                             )
 
@@ -166,9 +145,9 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                                 content = {
                                     CatDetailDescriptionItem(
                                         showImage = false,
-                                        text = currentCat.value.getOrigin()
+                                        text = currentCat.getOrigin()
                                     )
-                                    currentCat.value.getAverageLifeSpanText()
+                                    currentCat.getAverageLifeSpanText()
                                         .takeIf { it.isNotBlank() }
                                         ?.let {
                                             CatDetailDescriptionItem(
@@ -179,7 +158,7 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                                                 )
                                             )
                                         }
-                                    currentCat.value.getAverageWeightText()
+                                    currentCat.getAverageWeightText()
                                         .takeIf { it.isNotBlank() }
                                         ?.let {
                                             CatDetailDescriptionItem(
@@ -190,7 +169,7 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                                                 )
                                             )
                                         }
-                                    currentCat.value.getTemperamentItems()
+                                    currentCat.getTemperamentItems()
                                         .forEach { temperamentItem ->
                                             CatDetailDescriptionItem(
                                                 showImage = true,
@@ -202,7 +181,7 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
 
                             Text(
                                 modifier = Modifier.padding(top = 24.dp),
-                                text = currentCat.value.getDescription(),
+                                text = currentCat.getDescription(),
                                 style = TextStyle(
                                     color = Color.White,
                                     fontSize = 16.sp,
@@ -214,7 +193,7 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                             Spacer(modifier = Modifier.height(96.dp))
                         }
                     )
-                    if (!currentCat.value.getDetailsUrl().isNullOrBlank()) {
+                    if (!currentCat.getDetailsUrl().isNullOrBlank()) {
                         val context = LocalContext.current
                         Box(
                             modifier = Modifier
@@ -243,7 +222,9 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
                                             backgroundColor = Purple
                                         ),
                                     onClick = {
-                                        context.openUrl(currentCat.value.getDetailsUrl().orEmpty())
+                                        context.openUrl(
+                                            currentCat.getDetailsUrl().orEmpty()
+                                        )
                                     },
                                     content = {
                                         Text(
@@ -269,19 +250,30 @@ fun CatDetailsScreen(cat: CatModel, viewModel: CatDetailsViewModel, navControlle
         }
     )
 
-    if (state?.isLoading() == true) {
+    NetworkStateUI(viewModel = viewModel)
+}
+
+@Composable
+private fun NetworkStateUI(viewModel: CatDetailsViewModel) {
+    val state by viewModel.readStateFlow.collectAsState()
+    if (state.isLoading()) {
         LoadingOverlay()
+    } else if (state.isError()) {
+        LaunchedEffect(Unit) {
+            delay(Constants.Animation.DURATION_SNACKBAR_SHORT)
+            viewModel.dismissError()
+        }
     }
 
     BottomSnackbar(
         message = stringResource(
-            id = if (state?.isGenericError() == true) {
+            id = if (state.isGenericError()) {
                 R.string.snackbar_message_error_generic
             } else {
                 R.string.snackbar_message_error_no_internet
             }
         ),
-        show = state?.isError() == true
+        show = state.isError()
     )
 }
 
